@@ -8,6 +8,13 @@ export const authOptions = {
       clientSecret: process.env.GIT_HUB_CLIENT_SECRET,
     }),
   ],
+  // callbacks: {
+  //   async session({ session, token, user }) {
+  //     // Send properties to the client, like an access_token from a provider.
+      
+  //     return console.log(user)
+  //   }
+  // },
   secret: process.env.SECRET
 }
 

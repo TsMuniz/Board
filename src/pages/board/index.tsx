@@ -1,22 +1,59 @@
-import React from 'react'
+import React, {FormEvent, useState} from 'react'
 import styles from './style.module.scss'
 import Head from 'next/head'
 import { FiCalendar, FiClock, FiEdit2, FiPlus, FiTrash } from 'react-icons/fi'
 import { SupportButton } from '../../components/SupportButton'
 import { GetServerSideProps } from 'next'
-import { getSession, GetSessionParams } from 'next-auth/react'
+import { getSession } from 'next-auth/react'
+import { collection, addDoc } from "firebase/firestore";
+import { db } from '../../services/firebase'
+import { format } from 'date-fns'
+import Link from 'next/link'
 
-export default function Board() {
+
+export default function Board({user}) {
+  const [task, setTask] = useState('')
+  const [taskList, setTaskList] = useState([])
+
+  const saveTask = async (e: FormEvent) => {
+    e.preventDefault()
+    try {
+      if(task.length !== 0) {
+        const docRef = await addDoc(collection(db, "tasks"), {
+          userEmail: user.email,
+          task,
+          createdAt: new Date,
+          name: user.name
+        });
+        const data = {
+          id: docRef.id,
+          created: new Date(),
+          createdFormated: format(new Date(), 'dd MMMM yyyy'),
+          task,
+          userEmail: user.email,
+          name: user.name
+        }
+        setTaskList([...taskList, data])
+        setTask('')
+      }
+    } catch (e) {
+      console.error("Error adding document: ", e);
+    }
+  }
+
+  console.log(task)
   return (
     <>
     <Head>
       <title>Minhas tarefas - Board</title>
     </Head>
       <main className={styles.container}>
-        <form>
+        <form onSubmit={(e) => saveTask(e)}>
           <input
             type="text"
-            placeholder='Digite sua tarefa...' 
+            placeholder='Digite sua tarefa...'
+            value={task}
+            onChange={(e) => setTask(e.target.value)} 
           />
           <button          
           type='submit'
@@ -29,25 +66,34 @@ export default function Board() {
         </form>
 
         <section>
-          <article className={styles.taskList}>
-            <p>Aprender criar projestos usando next js e aplicando firebase como back.</p>
-            <div className={styles.actions}>
-              <div>
-                <div>
-                  <FiCalendar size={25} color="#ffb800"/>
-                  <time>17 Julho 2021</time>
+          {taskList.map((task,index) => {
+            return(
+              <article 
+              key={`${index}${task}`}
+              className={styles.taskList}
+              >
+                <Link href={`board/${task.id}`}>
+                  <p>{task.task}</p>
+                </Link>
+                <div className={styles.actions}>
+                  <div>
+                    <div>
+                      <FiCalendar size={25} color="#ffb800"/>
+                      <time>{task.createdFormated}</time>
+                    </div>
+                    <button>
+                      <FiEdit2 size={20} color="#fff"/>
+                      <span>Editar</span>
+                    </button>
+                  </div>
+                  <button>
+                    <FiTrash size={20} color="#ff3636"/>
+                    <span>Excluir</span>
+                  </button>
                 </div>
-                <button>
-                  <FiEdit2 size={20} color="#fff"/>
-                  <span>Editar</span>
-                </button>
-              </div>
-              <button>
-                <FiTrash size={20} color="#ff3636"/>
-                <span>Excluir</span>
-              </button>
-            </div>
-          </article>
+              </article>
+            )
+          })}
         </section>
 
       </main>
@@ -69,7 +115,7 @@ export default function Board() {
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const session = await getSession(context)
-  console.log(session)
+  const {user} = session
 
   if(!session) return {
     redirect: {
@@ -78,6 +124,6 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     }
   }
   return{
-    props: {}
+    props: {user}
   }
 }

@@ -1,20 +1,25 @@
 /* eslint-disable @next/next/no-img-element */
+import {signIn, signOut, useSession} from 'next-auth/react'
 import React from 'react'
 import styles from './styles.module.scss'
 import {FaGithub} from 'react-icons/fa'
 import {FiX} from 'react-icons/fi'
 
+
 export default function SignInButton() {
 
-    const session = false
+    const session = useSession()
+    console.log(session)
+   
   return (
-    session ? (
+    session.status === "authenticated" ? (
         <button 
             className={styles.signInButton}
             type="button"
+            onClick={() => signOut()}
         >   
-            <img src="https://sujeitoprogramador.com/steve.png" alt="imagem do usuario logado" />
-            Olá steve
+            <img src={session.data.user.image} alt="imagem do usuario logado" />
+            Olá {session.data.user.name}
             <FiX
                 className={styles.closeIcon}
                 color="#737380"
@@ -24,6 +29,7 @@ export default function SignInButton() {
         <button 
             className={styles.signInButton}
             type="button"
+            onClick={() => signIn('github')}
         >   
             <FaGithub
                 color="#ffb800"

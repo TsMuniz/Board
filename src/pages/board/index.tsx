@@ -1,21 +1,30 @@
 import React, {FormEvent, useState} from 'react'
 import styles from './style.module.scss'
 import Head from 'next/head'
-import { FiCalendar, FiClock, FiEdit2, FiPlus, FiTrash } from 'react-icons/fi'
+import { FiCalendar, FiClock, FiEdit2, FiPlus, FiTrash,FiX } from 'react-icons/fi'
 import { SupportButton } from '../../components/SupportButton'
 import { GetServerSideProps } from 'next'
 import { getSession } from 'next-auth/react'
-import { collection, addDoc, where, query, getDocs } from "firebase/firestore";
+import { collection, addDoc, where, query, getDocs, orderBy, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { db } from '../../services/firebase'
 import { format } from 'date-fns'
 import Link from 'next/link'
 
+type task = {
+  id: string,
+  createdAt: string | Date,
+  createdFormated: string,
+  task: string,
+  userEmail: string,
+  name: string
+}
 
 export default function Board({user, tasks}) {
   const parsedTasks = JSON.parse(tasks)
   
   const [task, setTask] = useState('')
-  const [taskList, setTaskList] = useState(parsedTasks)
+  const [taskList, setTaskList] = useState<task[]>(parsedTasks)
+  const [taskEdited, setTasEdited] = useState<task | null >(null)
 
   const saveTask = async (e: FormEvent) => {
     e.preventDefault()
@@ -27,6 +36,20 @@ export default function Board({user, tasks}) {
           createdAt: new Date(),
           name: user.name
         });
+
+      if(taskEdited) {
+        const taskRef = doc(db, "tasks", taskEdited.id);
+        await updateDoc(taskRef, {
+          task: taskEdited.task
+        });
+        const data = taskList
+        const taskIndex = taskList.findIndex((task) => task.id === taskEdited.id)
+        data[taskIndex].task = task
+        setTaskList(data)
+        setTasEdited(null)
+        setTask('')
+        return taskRef
+      }
         const data = {
           id: docRef.id,
           createdAt: new Date(),
@@ -43,12 +66,43 @@ export default function Board({user, tasks}) {
     }
   }
 
+  const deleteTask = (id: string) => {
+    deleteDoc(doc(db, "tasks", id))
+
+    const restTasks = taskList.filter((task) => task.id !== id )
+
+    setTaskList(restTasks)
+    
+  }
+
+  const updateTask = (task: task) => {
+    setTask(task.task)
+    setTasEdited(task)
+  }
+
+  const cancelUpdatedTask = () => {
+    setTask('')
+    setTasEdited(null)
+  }
+
   return (
     <>
     <Head>
       <title>Minhas tarefas - Board</title>
     </Head>
       <main className={styles.container}>
+        {
+          taskEdited && (
+            <span className={styles.warnText}>
+              <button
+                onClick={ cancelUpdatedTask }
+              >
+                <FiX size={30} color="#ff3636"/>
+              </button>
+              Voce esta editando uma tarefa!
+            </span>
+          )
+        }
         <form onSubmit={(e) => saveTask(e)}>
           <input
             type="text"
@@ -84,12 +138,16 @@ export default function Board({user, tasks}) {
                     </div>
                     <button>
                       <FiEdit2 size={20} color="#fff"/>
-                      <span>Editar</span>
+                      <span
+                        onClick={() => updateTask(task)}
+                      >Editar</span>
                     </button>
                   </div>
                   <button>
                     <FiTrash size={20} color="#ff3636"/>
-                    <span>Excluir</span>
+                    <span
+                      onClick={() => deleteTask(task.id)}
+                    >Excluir</span>
                   </button>
                 </div>
               </article>
@@ -116,9 +174,15 @@ export default function Board({user, tasks}) {
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const session = await getSession(context)
+  if(!session) return {
+    redirect: {
+      destination: '/',
+      permanent: false
+    }
+  }
   const {user} = session
 
-  const q = query(collection(db, "tasks"), where("userEmail", "==", user.email));
+  const q = query(collection(db, "tasks"), where("userEmail", "==", user.email), orderBy("createdAt"));
   const querySnapshot = await getDocs(q);
   let tasks = []
   querySnapshot.forEach((doc) => {
@@ -130,12 +194,6 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       })
   });
 
-  if(!session) return {
-    redirect: {
-      destination: '/',
-      permanent: false
-    }
-  }
   return{
     props: {user, tasks: JSON.stringify(tasks)}
   }

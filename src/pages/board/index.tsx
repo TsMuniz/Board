@@ -5,15 +5,17 @@ import { FiCalendar, FiClock, FiEdit2, FiPlus, FiTrash } from 'react-icons/fi'
 import { SupportButton } from '../../components/SupportButton'
 import { GetServerSideProps } from 'next'
 import { getSession } from 'next-auth/react'
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, where, query, getDocs } from "firebase/firestore";
 import { db } from '../../services/firebase'
 import { format } from 'date-fns'
 import Link from 'next/link'
 
 
-export default function Board({user}) {
+export default function Board({user, tasks}) {
+  const parsedTasks = JSON.parse(tasks)
+  
   const [task, setTask] = useState('')
-  const [taskList, setTaskList] = useState([])
+  const [taskList, setTaskList] = useState(parsedTasks)
 
   const saveTask = async (e: FormEvent) => {
     e.preventDefault()
@@ -22,12 +24,12 @@ export default function Board({user}) {
         const docRef = await addDoc(collection(db, "tasks"), {
           userEmail: user.email,
           task,
-          createdAt: new Date,
+          createdAt: new Date(),
           name: user.name
         });
         const data = {
           id: docRef.id,
-          created: new Date(),
+          createdAt: new Date(),
           createdFormated: format(new Date(), 'dd MMMM yyyy'),
           task,
           userEmail: user.email,
@@ -41,7 +43,6 @@ export default function Board({user}) {
     }
   }
 
-  console.log(task)
   return (
     <>
     <Head>
@@ -117,6 +118,18 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   const session = await getSession(context)
   const {user} = session
 
+  const q = query(collection(db, "tasks"), where("userEmail", "==", user.email));
+  const querySnapshot = await getDocs(q);
+  let tasks = []
+  querySnapshot.forEach((doc) => {
+    tasks.push(
+      {
+        id: doc.id,
+        createdFormated: format(doc.data().createdAt.toDate(), 'dd MMMM yyyy'),
+        ...doc.data()
+      })
+  });
+
   if(!session) return {
     redirect: {
       destination: '/',
@@ -124,6 +137,6 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     }
   }
   return{
-    props: {user}
+    props: {user, tasks: JSON.stringify(tasks)}
   }
 }

@@ -4,7 +4,7 @@ import Link from 'next/link'
 export function SupportButton() {
   return (
     <div className={styles.donateContainer}>
-      <Link href="/">
+      <Link href="/donate">
         <button>Apoiar</button>
       </Link>
     </div>
